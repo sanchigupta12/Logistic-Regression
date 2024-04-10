@@ -1,0 +1,383 @@
+---
+title: 'Module 3: GLM and Logistic Regression'
+author: "Sanchi Gupta, ALY6015 Intermediate Analytics"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Introduction
+
+The dataset from the ISLR library offers a comprehensive view of such factors, allowing for an exploratory dive into characteristics that distinguish private and public institutions. This report utilizes descriptive statistics and visualizations to unearth patterns and relationships within the dataset. Initially, the dataset is imported, and libraries essential for analysis are loaded. Subsequent descriptive analysis includes a summary table and various plots, such as scatter and box plots, illustrating the relationships between different variables such as student/faculty ratios and graduation rates. The analytical journey is further enriched by employing logistic regression to model the probability of a college being private, followed by an evaluation of the model's performance using confusion matrices and ROC curves. The insights derived from this analysis aim to provide a nuanced understanding of the factors influencing the private and public sectors of higher education.
+
+------------------------------------------------------------------------
+
+## 1. Import the data set and perform Exploratory Data Analysis by using descriptive statistics and plots to describe the data set
+
+### **a. Importing the data set and required libraries.**
+
+-   **Importing libraries**
+
+```{r}
+library(ISLR)
+library(caret)
+library(ggplot2)
+library(pROC)
+library(corrplot)
+library(knitr)
+library(kableExtra)
+library(dplyr)
+```
+
+-   **Importing the dataset**
+
+```{r}
+data("College")
+```
+
+### **b. Exploratory Data Analysis**
+
+-   **Descriptive Analysis**
+
+```{r}
+# Viewing Summary 
+college_summary <- summary(College)
+kable(college_summary, 
+      format = "html", 
+      caption = "Table 1: Summary Statistics of College Dataset") %>%
+                         kable_styling(bootstrap_options = c("striped", "hover", "condensed",                                                               "responsive"))
+```
+
+The table displays summary statistics for various columns in the college dataset. For instance, **'Private'** is a categorical variable indicating whether the college is private (yes) or public (no). There are 212 public colleges and 565 private colleges represented in the dataset.
+
+------------------------------------------------------------------------
+
+-   **Scatter Plot for University type**
+
+    ```{r}
+    # Scattarplot for indicating whether a college is private or public
+    qplot(x = Room.Board, y = Books, color = Private, shape= Private ,geom = 'point', data = College)+
+      labs(title = "Figure 1: Scatterplot Indicating Whether a University is Private or Public",
+           caption = "Note: Data points are colored and shaped according to the university type. Private universities may have different room and board costs compared to public universities.") +
+      theme_minimal()  +
+      theme(plot.caption = element_text(hjust = 0, size = 6)) 
+
+    ```
+
+**Interpretation of Figure 1: Scatter Plot Indicating Whether a University is Private or Public**
+
+The scatterplot suggests a distribution of universities according to the costs of books, rooms, and board. Data points are differentiated by color and shape to indicate the type of university: private (represented by triangles) or public (represented by circles). A cluster of data points in the middle of the plot suggests that many universities, both private and public, have similar room and board and book costs. Some private universities (triangles) have higher book costs and room and board costs, as indicated by triangles located higher on the y-axis and further right on the x-axis. The data points for private universities (triangles) seem to be generally higher on the y-axis (indicating higher book costs) than public universities
+
+This scatterplot provides a visual representation that could help in identifying cost-related trends between private and public universities, but it also indicates that there is a significant overlap in the costs associated with both types of institutions.
+
+------------------------------------------------------------------------
+
+-   **Box Plot indicating Graduation Rates by College**
+
+    ```{r}
+    # Boxplot for indicating Graduation rates by College
+    ggplot(College, aes(x = Private, y = Grad.Rate, fill= Private)) +
+      geom_boxplot() +
+       scale_fill_manual(values = c("lightblue", "lightgreen")) + 
+      labs(title = "Figure 2: Boxplot of Graduation Rates by College Type",
+           caption = "Note: Box colors represent college types, with light blue for private and light green for public colleges.",
+           x = "College Type (Private or Public)",
+           y = "Graduation Rate (%)")+
+      theme_minimal()
+    ```
+
+**Interpretation of Figure 2: Box Plot of Graduation Rates by College Type**
+
+This boxplot compares the graduation rates (%) between two groups: colleges labeled "no" (public) and "yes" (private). We can observe that private colleges generally have a higher median graduation rate than public colleges. There is a greater spread in the graduation rates of private colleges, suggesting more diversity in outcomes. Both private and public colleges have outliers, indicating some colleges have unusually high or low graduation rates compared to their respective groups.
+
+------------------------------------------------------------------------
+
+-   **Box Plot indicating Student/Faculty ratio by College**
+
+    ```{r}
+    # Boxplot for indicating Student/Faculty ratio by College
+    ggplot(College, aes(x = Private, y = S.F.Ratio, fill= Private)) +
+      geom_boxplot() +
+       scale_fill_manual(values = c("lightblue", "lightgreen")) + 
+      labs(title = "Figure 3: Boxplot of Student/Faculty ratio by College Type",
+           caption = "Note: Box colors represent college types. Light blue for private and light green for public colleges.",
+           x = "College Type (Private or Public)",
+           y = "Student/Faculty Ratio")+
+      theme_minimal()
+
+
+    ```
+
+**Interpretation of Figure 3: Box Plot of Student/Faculty ratio by College Type**
+
+The above boxplot compares the student-to-faculty ratios between two groups of colleges: those labeled "no" (public colleges) and "yes" (private colleges). We can observe that private colleges tend to have lower student/faculty ratios than public colleges. There's a greater spread and more variability in student/faculty ratios among public colleges. Both types of colleges have outliers, but public colleges show a greater number of high student/faculty ratios, which could indicate some public colleges operate with significantly larger class sizes or fewer faculty members relative to their student population.
+
+------------------------------------------------------------------------
+
+-   **Correlation Matrix**
+
+```{r}
+# Correlation matrix for numeric variables
+numeric_extract <- College %>% select(-c(Private))
+
+# Calculating correlation matrix
+correlation_table <- cor(numeric_extract, use = "complete.obs")
+
+# Plotting correlation matrix
+corrplot(correlation_table, 
+         method = "circle",
+         type = "upper",
+         tl.col = "black",
+         tl.srt = 40,
+         tl.cex = 0.75,
+         addrect = 3) 
+
+# Adding caption below the plot
+mtext("Figure 4: Correlation Matrix Heatmap for Numeric Variables", side = 1, line = 4.2, cex = 0.75, adj = 0, font = 3)
+
+
+```
+
+**Interpretation of Figure 4: Correlation Matrix Heatmap**
+
+The above correlation matrix is used to represent the correlation coefficients between pairs of variables in a dataset. Each cell in the heatmap corresponds to the correlation between the variables on the x and y axes. For instance, as shown above, variables such as 'F.undergrad' and 'Enroll' seem to have a strong positive correlation (dark blue), which is logical as colleges with more full-time undergraduates would likely have higher enrollment numbers.
+
+------------------------------------------------------------------------
+
+## 2. Split the data into a train and test set
+
+```{r}
+set.seed(123)
+train_index <- createDataPartition(College$Private, p=0.7, list = FALSE)
+train <- College[train_index,]
+test <- College[-train_index,]
+# (Code Sorced from Canvas- Lab: Logistic Regression)
+```
+
+------------------------------------------------------------------------
+
+## 3. Fit logistic regression model
+
+```{r}
+model_1 <- glm(Private ~. , data= train, family= binomial)
+summary(model_1)
+```
+
+The model seems to fit the data well since the residual deviance has decreased substantially from the null deviance. 'Outstate' and 'F.Undergrad' appear to be important predictors in determining whether a university is private or not, with tuition fees for out-of-state students increasing the likelihood of a university being private, and a larger number of full-time undergraduates decreasing this likelihood.
+
+------------------------------------------------------------------------
+
+## 4. Create a confusion matrix and report the results of your model predictions on the train set. Interpret and discuss the confusion matrix. Which misclassifications are more damaging for the analysis, False Positives or False Negatives?
+
+```{r}
+# Building predictive model for train dataset
+```
+
+```{r}
+prob.train <- predict(model_1, newdata = train, type = "response")
+```
+
+```{r}
+predicted.min <- as.factor(ifelse(prob.train>= 0.5, "Yes", "No"))
+
+# Creating Confusion Matrix for train dataset
+train_matrix <- confusionMatrix(predicted.min, train$Private, positive = 'Yes')
+
+print(train_matrix)
+# (Code Sorced from Canvas- Lab: Logistic Regression)
+```
+
+**Discussion of Confusion Matrix:**
+
+-   **True Negatives (TN):** 137 (the model correctly predicted the 'No' class)
+
+-   **False Positives (FP):** 11 (the model incorrectly predicted 'Yes' when it was actually 'No')
+
+-   **False Negatives (FN):** 12 (the model incorrectly predicted 'No' when it was actually 'Yes')
+
+-   **True Positives (TP):** 385 (the model correctly predicted the 'Yes' class)
+
+The model seems to have a slightly higher number of False Negatives compared to False Positives. However, both types of errors are relatively low.
+
+**Q: Which misclassifications are more damaging for the analysis, False Positives or False Negatives?**
+
+**A:** The classification of which is more damaging (FP or FN) depends on the context of the analysis. If the 'Yes' class represents private universities and the analysis is for resource allocation, then false negatives might be more damaging because they represent private universities that are not identified as such, potentially leading to a misallocation of resources. Conversely, if the 'Yes' class represents universities requiring interventions due to poor performance, then false positives might be more damaging as they represent resources being unnecessarily allocated to universities that do not need them.
+
+------------------------------------------------------------------------
+
+## 5. Report and interpret Accuracy, Precision, Recall, and Specificity metrics
+
+**Interpretation of Confusion Matrix for train set:**
+
+-   **Accuracy:**
+
+    -   **Reported Value:** 0.9578 (or 95.78%)
+
+    -   **Interpretation:** The accuracy indicates that approximately 95.78% of all predictions made by the model are correct.
+
+-   **Precision (Positive Predictive Value):**
+
+    -   **Reported Value:** 0.9698 (or 96.98%)
+
+    -   **Interpretation:** This measures the model's ability to correctly predict positive observations out of all observations it predicted as positive. In this case, when the model predicts a university as private, it is correct about 96.98% of the time.
+
+-   **Recall (Sensitivity):**
+
+    -   **Reported Value:** 0.9722 (or 97.22%)
+
+    -   **Interpretation:** Recall quantifies the model's ability to identify all actual positives. The recall of approximately 97.22% indicates that the model is excellent at correctly identifying private universities as private.
+
+-   **Specificity:**
+
+    -   **Reported Value:** 0.9195 (or 91.95%)
+
+    -   **Interpretation:** Specificity measures the model's ability to correctly identify negative observations. With a specificity of around 91.95%, the model is also very good at correctly identifying public universities as public, although it's slightly less effective compared to how it identifies private universities.
+
+------------------------------------------------------------------------
+
+## 6. Create a confusion matrix and report the results of your model for the test set. Compare the results with the train set and interpret
+
+```{r}
+# Building predictive model for test dataset
+prob.test <- predict(model_1, newdata = test, type = "response")
+
+predicted.min <- as.factor(ifelse(prob.test>= 0.5, "Yes", "No"))
+
+# Creating Confusion Matrix for test dataset
+test_matrix <- confusionMatrix(predicted.min, test$Private, positive = 'Yes')
+
+print(test_matrix)
+```
+
+**Interpretation of Confusion Matrix for test set:**
+
+-   **Accuracy:**
+
+    -   **Reported Value:** 0.944 or 94.4%
+
+    -   **Interpretation:** A high proportion of the total predictions made by the model are correct, indicating it is performing well on the test set.
+
+-   **Precision (Positive Predictive Value):**
+
+    -   **Reported Value:** 0.9535 or 95.35%
+
+    -   **Interpretation:** When the model predicts a university as 'Yes' (private), it is correct 95.35% of the time. This high precision suggests there are relatively few false positives.
+
+-   **Recall (Sensitivity):**
+
+    -   **Reported Value:** 0.9704 or 97.04%
+
+    -   **Interpretation:** The model is very effective at identifying true 'Yes' cases. It correctly identifies 97.04% of all actual 'Yes' cases, indicating a high sensitivity.
+
+-   **Specificity:**
+
+    -   **Reported Value:** 0.8730 or 87.3%
+
+    -   **Interpretation:** The model correctly identifies 87.3% of the actual 'No' cases (presumably public universities). While slightly lower than the sensitivity, it still indicates a good ability to distinguish 'No' cases.
+
+#### [Comparison between Train Set and Test Set]{.underline}
+
+```{r}
+
+# Extract performance metrics for training set
+train_metrics <- c( train_matrix$overall['Accuracy'],
+                    train_matrix$byClass['Sensitivity'],
+                    train_matrix$byClass['Specificity'],
+                    train_matrix$byClass['Pos Pred Value']
+)
+
+# Extract performance metrics for test set
+test_metrics <- c(test_matrix$overall['Accuracy'],
+                    test_matrix$byClass['Sensitivity'],
+                    test_matrix$byClass['Specificity'],
+                    test_matrix$byClass['Pos Pred Value']
+)
+
+# Create a data frame for visualization
+performance_matrix <- data.frame(
+  Metric = rep(names(train_metrics), each = 2),
+  Value = c(train_metrics, test_metrics),
+  Dataset = factor(rep(c("Train Set", "Test Set"), times = length(train_metrics)))
+)
+
+
+# Create the line plot
+ggplot(data = performance_matrix, aes(x = Metric, y = Value, group = Dataset, color = Dataset)) +
+  geom_line() +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(title = "Figure 5: Performance Metrics: Train vs. Test Set",
+       caption = "Note: Lines indicate performance metrics for training and test datasets. Blue represents the training set; red represents the test set.",
+       x = "Metric",
+       y = "Value") +
+  scale_color_manual(values = c("Train Set" = "blue", "Test Set" = "red")) +
+  theme(plot.caption = element_text(hjust = 0, size = 8))
+
+```
+
+**Interpretation for Figure 5: Performance Metrics: Train vs. Test Set**
+
+-   **Accuracy:** Both the training and test sets have high accuracy, with the training set slightly outperforming the test set.
+
+-   **Positive Predictive Value (Precision):** There's a notable dip for the training set compared to the test set, suggesting that when the model predicts an instance as positive, it is more likely to be correct in the test set.
+
+-   **Sensitivity (Recall):** The training set shows a slight improvement in sensitivity compared to the test set, meaning it's slightly better at identifying all the true positive instances during training.
+
+-   **Specificity:** Specificity is higher in the test set than in the training set, indicating the model is better at correctly identifying true negative instances in new, unseen data.
+
+------------------------------------------------------------------------
+
+## 7. Plot and interpret the ROC curve
+
+```{r}
+# Generate the ROC curve object
+roc_curve <- roc(test$Private, prob.test)
+
+# Plot ROC curve
+plot(roc_curve, main="Figure 6: ROC Curve",
+     xlab="1 - Specificity (False Positive Rate)",
+     ylab="Sensitivity (True Positive Rate)",
+     col="blue")
+
+
+# (OpenAI, 2024)
+
+```
+
+**Interpretation of Figure 6: ROC Curve**
+
+In the above graph the x-axis is correctly labeled as "1 - Specificity (False Positive Rate)" and the y-axis represents the sensitivity (true positive rate). The blue line represents the ROC curve of the model. The closer this line is to the top left corner of the plot, the better the model is at distinguishing between the positive and negative classes. The curve in the graph approaches the top left corner, indicating good model performance.
+
+The diagonal grey line represents a no-skill classifier that does no better than random chance. The ROC curve's significant deviation above this line indicates that the model has good discriminative ability.
+
+------------------------------------------------------------------------
+
+## 8. Calculate and interpret the AUC
+
+```{r}
+# Calculate the area under the ROC curve (AUC)
+auc(roc_curve)
+```
+
+**Interpretation of AUC:**
+
+The AUC is a measure of the overall performance of a classification model. An AUC of 0.9753 is very close to 1, which is the maximum possible value. This indicates an excellent level of discrimination by the model, meaning it is very effective at distinguishing between the positive class and the negative class. This high AUC value often correlates with a high level of accuracy in predictions, though it's always important to consider the AUC in the context of the specific application and the consequences of false positives and false negatives.
+
+In summary, an AUC of 0.9753 suggests that the model has a high probability of ranking a randomly chosen positive instance (private university) higher than a randomly chosen negative instance (public university), in terms of the predicted probabilities of being positive.
+
+------------------------------------------------------------------------
+
+## Conclusion
+
+The analytical exploration of the College dataset has revealed significant insights into the factors that differentiate private and public colleges. Through a combination of logistic regression modeling and performance evaluation metrics, the analysis has demonstrated that variables such as out-of-state tuition and full-time undergraduate enrollment serve as significant predictors of a college's private or public status. The high accuracy and AUC of the model suggest robust predictive capabilities, potentially guiding stakeholders in making informed decisions. While the study provides a solid foundation, it also opens avenues for further research, particularly in examining the causal relationships and long-term trends that might influence these educational institutions. The findings underscore the complexity and multifaceted nature of higher education systems, highlighting the importance of data-driven approaches in educational policy and administration.
+
+------------------------------------------------------------------------
+
+## References
+
+-   *OpenAI. (2021). ChatGPT (Version 3.5). OpenAI.<https://chat.openai.com/>*
+
+-   Frasca. (n.d.). Lab: Logistic Regression Video  [Video]. Panopto. Northeastern University
+
+```{r}
+View(swiss)
+```
